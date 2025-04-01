@@ -39,15 +39,15 @@ type Actress = Person & {
 /* ACTOR */
 type Actor = Person & {
   known_for: [string, string, string];
-  awards: [string, string?];
+  awards: [string] | [string, string];
   nationality: NationalityListActor;
 };
 
-/* ACTRESSES */
-function isActress(data: unknown): data is Actress {
+function isPerson(data: unknown): data is Person {
   if (
     data &&
     typeof data === "object" &&
+    data !== null &&
     "id" in data &&
     typeof data.id === "number" &&
     "name" in data &&
@@ -57,9 +57,21 @@ function isActress(data: unknown): data is Actress {
     "biography" in data &&
     typeof data.biography === "string" &&
     "image" in data &&
-    typeof data.image === "string" &&
+    typeof data.image === "string"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/* ACTRESSES */
+function isActress(data: unknown): data is Actress {
+  if (
+    isPerson(data) &&
     "most_famous_movies" in data &&
     Array.isArray(data.most_famous_movies) &&
+    data.most_famous_movies.length === 3 &&
+    data.most_famous_movies.every((m) => typeof m === "string") &&
     "awards" in data &&
     typeof data.awards === "string" &&
     "nationality" in data &&
@@ -93,24 +105,34 @@ async function getActress<T>(id: number): Promise<T | null> {
       throw new Error(`Errore HTTP ${res.status}`);
     }
 
-    const data = await res.json();
-    if (isActress(data)) {
-      return data as T;
-    } else throw new Error("I dati non sono validi");
+    const data: unknown = await res.json();
+    if (!isActress(data)) {
+      throw new Error("I dati non sono validi");
+    }
+    return data as T;
   } catch (error) {
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero dell'attrice:", error);
+    } else console.log("Errore sconosciuto:", error);
     return null;
   }
 }
 
-async function getActresses(nums: number[]): Promise<Actress[] | null> {
-  let promises: Promise<Actress | null>[] = [];
-  nums.forEach((n) => {
-    promises.push(getActress(n));
-  });
-  const resData = await Promise.all(promises);
+async function getActresses(nums: number[]): Promise<(Actress | null)[]> {
+  try {
+    let promises: Promise<Actress | null>[] = [];
+    nums.forEach((n) => {
+      promises.push(getActress(n));
+    });
+    const resData = await Promise.all(promises);
 
-  const data = resData.filter((d) => d !== null);
-  return data;
+    return resData.filter((d) => d !== null);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero delle attrici:", error);
+    } else console.log("Errore sconosciuto:", error);
+    return [];
+  }
 }
 
 async function getAllActresses(): Promise<Actress[] | null> {
@@ -123,30 +145,33 @@ async function getAllActresses(): Promise<Actress[] | null> {
       throw new Error(`Errore HTTP ${res.status}`);
     }
 
-    const data = await res.json();
+    const data: unknown = await res.json();
 
-    data.forEach((d: unknown) => {
-      if (isActress(d)) {
-        return;
-      } else {
-        throw new Error("I dati non sono validi");
-      }
-    });
+    if (!Array.isArray(data)) {
+      throw new Error("Formato dei dati non valido");
+    }
 
-    return data;
+    const dataValid = data.filter((d) => isActress(d));
+    return dataValid;
   } catch (error) {
-    return null;
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero delle attrici:", error);
+    } else console.log("Errore sconosciuto:", error);
+    return [];
   }
 }
 
 function createActress(data: Omit<Actress, "id">): Actress {
   return {
-    id: 10,
+    id: Math.floor(Math.random() * 100),
     ...data,
   };
 }
 
-function updateActress(actress: Actress, update: Partial<Actress>): Actress {
+function updateActress(
+  actress: Actress,
+  update: Partial<Omit<Actress, "id" | "name">>
+): Actress {
   return { ...actress, ...update };
 }
 
@@ -165,22 +190,15 @@ getAllActresses()
 /* ACTORS */
 function isActor(data: unknown): data is Actor {
   if (
-    data &&
-    typeof data === "object" &&
-    "id" in data &&
-    typeof data.id === "number" &&
-    "name" in data &&
-    typeof data.name === "string" &&
-    "birth_year" in data &&
-    typeof data.birth_year === "number" &&
-    "biography" in data &&
-    typeof data.biography === "string" &&
-    "image" in data &&
-    typeof data.image === "string" &&
+    isPerson(data) &&
     "known_for" in data &&
     Array.isArray(data.known_for) &&
+    data.known_for.length === 3 &&
+    data.known_for.every((m) => typeof m === "string") &&
     "awards" in data &&
     Array.isArray(data.awards) &&
+    (data.awards.length === 1 || data.awards.length === 2) &&
+    data.awards.every((m) => typeof m === "string") &&
     "nationality" in data &&
     typeof data.nationality === "string" &&
     [
@@ -218,24 +236,34 @@ async function getActor<T>(id: number): Promise<T | null> {
       throw new Error(`Errore HTTP ${res.status}`);
     }
 
-    const data = await res.json();
-    if (isActor(data)) {
-      return data as T;
-    } else throw new Error("I dati non sono validi");
+    const data: unknown = await res.json();
+    if (!isActor(data)) {
+      throw new Error("I dati non sono validi");
+    }
+    return data as T;
   } catch (error) {
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero dell'attore:", error);
+    } else console.log("Errore sconosciuto:", error);
     return null;
   }
 }
 
-async function getActors(nums: number[]): Promise<Actor[] | null> {
-  let promises: Promise<Actor | null>[] = [];
-  nums.forEach((n) => {
-    promises.push(getActor(n));
-  });
-  const resData = await Promise.all(promises);
+async function getActors(nums: number[]): Promise<(Actor | null)[]> {
+  try {
+    let promises: Promise<Actor | null>[] = [];
+    nums.forEach((n) => {
+      promises.push(getActor(n));
+    });
+    const resData = await Promise.all(promises);
 
-  const data = resData.filter((d) => d !== null);
-  return data;
+    return resData.filter((d) => d !== null);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero degli attori:", error);
+    } else console.log("Errore sconosciuto:", error);
+    return [];
+  }
 }
 
 async function getAllActors(): Promise<Actor[] | null> {
@@ -248,30 +276,33 @@ async function getAllActors(): Promise<Actor[] | null> {
       throw new Error(`Errore HTTP ${res.status}`);
     }
 
-    const data = await res.json();
+    const data: unknown = await res.json();
 
-    data.forEach((d: unknown) => {
-      if (isActor(d)) {
-        return;
-      } else {
-        throw new Error("I dati non sono validi");
-      }
-    });
+    if (!Array.isArray(data)) {
+      throw new Error("Formato dei dati non valido");
+    }
 
-    return data;
+    const dataValid = data.filter((d) => isActor(d));
+    return dataValid;
   } catch (error) {
-    return null;
+    if (error instanceof Error) {
+      console.log("Errore durante il recupero degli attori:", error);
+    } else console.log("Errore sconosciuto:", error);
+    return [];
   }
 }
 
 function createActor(data: Omit<Actor, "id">): Actor {
   return {
-    id: 10,
+    id: Math.floor(Math.random() * 100),
     ...data,
   };
 }
 
-function updateActor(actor: Actor, update: Partial<Actor>): Actor {
+function updateActor(
+  actor: Actor,
+  update: Partial<Omit<Actor, "id" | "name">>
+): Actor {
   return { ...actor, ...update };
 }
 
@@ -289,8 +320,10 @@ getAllActors()
 
 /* createRandomCouple */
 async function createRandomCouple(): Promise<[Actress, Actor]> {
-  const actresses = await getAllActresses();
-  const actors = await getAllActors();
+  const [actresses, actors] = await Promise.all([
+    getAllActresses(),
+    getAllActors(),
+  ]);
 
   if (!actresses || actresses.length === 0) {
     throw new Error("Nessuna attrice disponibile.");
@@ -300,13 +333,15 @@ async function createRandomCouple(): Promise<[Actress, Actor]> {
     throw new Error("Nessun attore disponibile.");
   }
 
-  const randomActresses =
-    actresses[Math.floor(Math.random() * actresses.length)];
-  const randomActors = actors[Math.floor(Math.random() * actors.length)];
+  const randomActress = actresses[Math.floor(Math.random() * actresses.length)];
+  const randomActor = actors[Math.floor(Math.random() * actors.length)];
 
-  return [randomActresses, randomActors];
+  return [randomActress, randomActor];
 }
 
 createRandomCouple()
-  .then((data) => console.log("Attore:", data[0], "Attrice:", data[1]))
+  .then((data) =>
+    console.log(`Attore: ${data[0].name},
+Attrice: ${data[1].name}`)
+  )
   .catch((error) => console.error(error));
